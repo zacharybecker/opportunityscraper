@@ -1,5 +1,5 @@
 import { Title, SimpleGrid, Card, Text, Group, Stack, Badge, Table, Loader, Center } from '@mantine/core'
-import { IconFileSearch, IconStar, IconClock, IconKanban } from '@tabler/icons-react'
+import { IconFileSearch, IconStar, IconClock, IconLayoutKanban } from '@tabler/icons-react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
@@ -42,7 +42,7 @@ export default function Dashboard() {
         <StatCard title="Active Opportunities" value={d.active_opportunities} icon={IconFileSearch} color="blue" />
         <StatCard title="High Relevancy" value={d.high_relevancy_count} icon={IconStar} color="yellow" />
         <StatCard title="Approaching Deadlines" value={d.approaching_deadlines} icon={IconClock} color="red" />
-        <StatCard title="In Pipeline" value={totalPipeline} icon={IconKanban} color="green" />
+        <StatCard title="In Pipeline" value={totalPipeline} icon={IconLayoutKanban} color="green" />
       </SimpleGrid>
 
       <SimpleGrid cols={{ base: 1, lg: 2 }}>

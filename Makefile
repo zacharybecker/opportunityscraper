@@ -1,6 +1,6 @@
 .PHONY: up down build logs backend-logs frontend-logs db-logs shell migrate revision
 
-COMPOSE = docker compose -f docker/docker-compose.yml --env-file docker/.env
+COMPOSE = docker compose --env-file .env
 
 up:
 	$(COMPOSE) up -d

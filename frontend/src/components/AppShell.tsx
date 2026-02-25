@@ -12,7 +12,7 @@ import {
 import {
   IconDashboard,
   IconSearch,
-  IconKanban,
+  IconLayoutKanban,
   IconBuilding,
   IconRobot,
   IconSettings,
@@ -29,7 +29,7 @@ import { useLogout } from '../hooks/useAuth'
 const navItems = [
   { label: 'Dashboard', icon: IconDashboard, path: '/' },
   { label: 'Opportunities', icon: IconSearch, path: '/opportunities' },
-  { label: 'Pipeline', icon: IconKanban, path: '/pipeline' },
+  { label: 'Pipeline', icon: IconLayoutKanban, path: '/pipeline' },
   { label: 'Company Profile', icon: IconBuilding, path: '/company' },
   { label: 'Scrapers', icon: IconSpider, path: '/scrapers' },
   { label: 'Settings', icon: IconSettings, path: '/settings' },

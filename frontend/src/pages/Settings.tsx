@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   Title, Stack, Tabs, Card, NumberInput, Switch, Button, Group,
-  TextInput, MultiSelect, Text, Loader, Center, ActionIcon,
+  TextInput, TagsInput, Text, Loader, Center, ActionIcon,
   Textarea, Badge, Table,
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
@@ -58,13 +58,9 @@ function RelevancyTab() {
             <NumberInput label="Past Performance Weight" step={0.1} decimalScale={1} {...form.getInputProps('past_performance_weight')} />
           </Group>
           <NumberInput label="Future Goals Weight" step={0.1} decimalScale={1} {...form.getInputProps('future_goals_weight')} />
-          <MultiSelect
+          <TagsInput
             label="State Preferences"
-            data={form.values.state_preferences.map((s) => ({ value: s, label: s }))}
             {...form.getInputProps('state_preferences')}
-            searchable creatable
-            getCreateLabel={(q) => `+ ${q}`}
-            onCreate={(q) => { form.setFieldValue('state_preferences', [...form.values.state_preferences, q]); return q }}
           />
           <Switch label="Auto-add to pipeline when above threshold" {...form.getInputProps('auto_pipeline', { type: 'checkbox' })} />
           <Button type="submit" loading={saveMutation.isPending}>Save Settings</Button>

@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import {
   Title, Stack, Card, TextInput, Textarea, NumberInput, Button,
-  Group, MultiSelect, Loader, Center, Divider, Text, ActionIcon,
+  Group, MultiSelect, TagsInput, Loader, Center, Text, ActionIcon,
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { IconPlus, IconTrash } from '@tabler/icons-react'
@@ -99,17 +99,9 @@ export default function CompanyProfile() {
             data={SMALL_BIZ_OPTIONS}
             {...form.getInputProps('small_business_types')}
           />
-          <MultiSelect
+          <TagsInput
             label="NAICS Codes"
-            data={form.values.naics_codes.map((c) => ({ value: c, label: c }))}
             {...form.getInputProps('naics_codes')}
-            searchable
-            creatable
-            getCreateLabel={(q) => `+ Add ${q}`}
-            onCreate={(q) => {
-              form.setFieldValue('naics_codes', [...form.values.naics_codes, q])
-              return q
-            }}
           />
         </Stack>
       </Card>

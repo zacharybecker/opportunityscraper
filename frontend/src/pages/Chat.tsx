@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   Title, Stack, Card, TextInput, Button, Group, Text,
-  ScrollArea, Loader, ActionIcon, Paper, NavLink,
+  ScrollArea, Loader, ActionIcon, Paper, NavLink, Center,
 } from '@mantine/core'
 import { IconSend, IconPlus, IconTrash, IconMessageCircle } from '@tabler/icons-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
