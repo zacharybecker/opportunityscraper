@@ -35,3 +35,5 @@ pgdata/
 # Alembic
 backend/alembic/versions/*.py
 !backend/alembic/versions/.gitkeep
+
+.claude
