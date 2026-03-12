@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { getOpportunity, analyzeOpportunity, addToPipeline } from '../api'
+import apiClient from '../api/client'
 import { notifications } from '@mantine/notifications'
 
 export default function OpportunityDetail() {
@@ -26,6 +27,12 @@ export default function OpportunityDetail() {
       notifications.show({ title: 'Analysis queued', message: 'AI analysis has been started', color: 'blue' })
       setTimeout(() => queryClient.invalidateQueries({ queryKey: ['opportunity', id] }), 5000)
     },
+  })
+
+  const proposalMutation = useMutation({
+    mutationFn: () =>
+      apiClient.post('/proposals', { title: `Proposal: ${opp?.title}`, opportunity_id: id }).then((r) => r.data),
+    onSuccess: (data) => navigate(`/proposals/${data.id}`),
   })
 
   const pipelineMutation = useMutation({
@@ -92,6 +99,14 @@ export default function OpportunityDetail() {
               {opp.pipeline_entry && (
                 <Badge size="lg" color="blue">Pipeline: {opp.pipeline_entry.stage}</Badge>
               )}
+              <Button
+                variant="light"
+                color="violet"
+                onClick={() => proposalMutation.mutate()}
+                loading={proposalMutation.isPending}
+              >
+                Create Proposal
+              </Button>
             </Group>
           </Group>
 

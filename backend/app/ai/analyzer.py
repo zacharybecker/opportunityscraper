@@ -2,15 +2,42 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.ai.client import chat_completion
 from app.db import async_session
-from app.models import CompanyProfile, Opportunity, OpportunityAnalysis, PipelineEntry
+from app.models import CompanyProfile, KnowledgeDocument, Opportunity, OpportunityAnalysis, PipelineEntry
 
 logger = logging.getLogger(__name__)
 
 PROMPT_VERSION = "1.0"
+
+
+async def build_company_context_with_kb(company: CompanyProfile, opp_text: str = "") -> str:
+    """Build company context including relevant knowledge base documents."""
+    parts = [build_company_context(company)]
+
+    # Search knowledge base for relevant docs
+    if opp_text:
+        try:
+            from app.db import async_session
+            from app.models import KnowledgeDocument
+
+            async with async_session() as db:
+                ts_query = func.plainto_tsquery('english', opp_text[:200])
+                result = await db.execute(
+                    select(KnowledgeDocument)
+                    .where(KnowledgeDocument.search_vector.op('@@')(ts_query))
+                    .limit(3)
+                )
+                kb_docs = result.scalars().all()
+                for doc in kb_docs:
+                    if doc.extracted_text:
+                        parts.append(f"\nKnowledge Base ({doc.title}):\n{doc.extracted_text[:2000]}")
+        except Exception as e:
+            logger.warning(f"Failed to load knowledge base context: {e}")
+
+    return "\n".join(parts)
 
 
 def build_company_context(company: CompanyProfile) -> str:
@@ -72,7 +99,7 @@ def build_opportunity_context(opp: Opportunity) -> str:
 
 async def analyze_opportunity(opp: Opportunity, company: CompanyProfile) -> dict:
     """Run the 4-step AI analysis pipeline on an opportunity."""
-    company_ctx = build_company_context(company)
+    company_ctx = await build_company_context_with_kb(company, opp.title or "")
     opp_ctx = build_opportunity_context(opp)
     total_tokens = 0
     settings = company.relevancy_settings or {}

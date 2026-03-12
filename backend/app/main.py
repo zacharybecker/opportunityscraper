@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routes import auth, company, opportunities, scrapers, analysis, pipeline, chat, notifications, analytics, admin, codes
+from app.routes import auth, company, opportunities, scrapers, analysis, pipeline, chat, notifications, analytics, admin, codes, in_app_notifications, knowledge, proposals, manual_opportunity
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -14,8 +14,9 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # Startup
     try:
-        from app.jobs import setup_scheduler, sync_scraper_schedules
+        from app.jobs import setup_scheduler, sync_scraper_schedules, seed_default_scrapers
         setup_scheduler()
+        await seed_default_scrapers()
         await sync_scraper_schedules()
         logger.info("Scheduler initialized")
     except Exception as e:
@@ -53,6 +54,10 @@ app.include_router(notifications.router, prefix=PREFIX)
 app.include_router(analytics.router, prefix=PREFIX)
 app.include_router(admin.router, prefix=PREFIX)
 app.include_router(codes.router, prefix=PREFIX)
+app.include_router(in_app_notifications.router, prefix=PREFIX)
+app.include_router(knowledge.router, prefix=PREFIX)
+app.include_router(proposals.router, prefix=PREFIX)
+app.include_router(manual_opportunity.router, prefix=PREFIX)
 
 
 @app.get("/api/health")

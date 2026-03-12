@@ -3,6 +3,7 @@ import math
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, or_, desc, asc, text
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -40,14 +41,23 @@ async def list_opportunities(
     )
 
     if search:
-        query = query.where(
-            or_(
-                Opportunity.title.ilike(f"%{search}%"),
-                Opportunity.description.ilike(f"%{search}%"),
-                Opportunity.solicitation_number.ilike(f"%{search}%"),
-                Opportunity.agency.ilike(f"%{search}%"),
+        # Use full-text search if search_vector column exists, fallback to ILIKE
+        try:
+            ts_query = func.plainto_tsquery('english', search)
+            query = query.where(
+                Opportunity.search_vector.op('@@')(ts_query)
+            ).order_by(
+                func.ts_rank(Opportunity.search_vector, ts_query).desc()
             )
-        )
+        except Exception:
+            query = query.where(
+                or_(
+                    Opportunity.title.ilike(f"%{search}%"),
+                    Opportunity.description.ilike(f"%{search}%"),
+                    Opportunity.solicitation_number.ilike(f"%{search}%"),
+                    Opportunity.agency.ilike(f"%{search}%"),
+                )
+            )
     if source:
         query = query.where(Opportunity.source == source)
     if naics_code:
@@ -163,4 +173,39 @@ async def trigger_parse_documents(
     if not opp:
         raise HTTPException(status_code=404, detail="Opportunity not found")
 
+    # Launch background document parsing
+    asyncio.create_task(_parse_documents_task(str(opp.id)))
     return {"status": "parse_queued", "opportunity_id": str(opp.id)}
+
+
+async def _parse_documents_task(opportunity_id: str):
+    """Background task to download and parse opportunity documents."""
+    from app.db import async_session
+    from app.services.document_parser import download_and_parse_document
+
+    async with async_session() as db:
+        try:
+            result = await db.execute(
+                select(Opportunity).where(Opportunity.id == opportunity_id)
+            )
+            opp = result.scalar_one_or_none()
+            if not opp or not opp.documents:
+                return
+
+            updated_docs = []
+            for doc in opp.documents:
+                if not isinstance(doc, dict):
+                    continue
+                url = doc.get("url")
+                filename = doc.get("filename", "unknown")
+                if url:
+                    parsed = await download_and_parse_document(url, filename)
+                    updated_docs.append({**doc, **parsed})
+                else:
+                    updated_docs.append({**doc, "parse_status": "no_url"})
+
+            opp.documents = updated_docs
+            await db.commit()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Document parsing failed for {opportunity_id}: {e}")

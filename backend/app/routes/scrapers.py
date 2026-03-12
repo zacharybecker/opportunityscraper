@@ -113,6 +113,49 @@ async def list_runs(
     return [ScrapeRunResponse.model_validate(r) for r in result.scalars().all()]
 
 
+@router.post("/{scraper_id}/test")
+async def test_scraper(
+    scraper_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("analyst")),
+):
+    """Dry-run: fetch a small sample without saving to database."""
+    result = await db.execute(select(ScraperConfig).where(ScraperConfig.id == scraper_id))
+    scraper = result.scalar_one_or_none()
+    if not scraper:
+        raise HTTPException(status_code=404, detail="Scraper not found")
+
+    try:
+        if scraper.scraper_type == "generic_web":
+            from app.scrapers.generic_web import scrape_generic_web
+            # Limit to 1 page for preview
+            preview_config = {**scraper.config, "pagination": {**scraper.config.get("pagination", {}), "max_pages": 1}}
+            results = await scrape_generic_web(preview_config)
+        elif scraper.scraper_type == "sam_gov":
+            from app.scrapers.sam_gov import scrape_sam_gov
+            # Limit lookback for preview
+            preview_config = {**scraper.config, "lookback_days": 7}
+            results = await scrape_sam_gov(preview_config)
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown scraper type: {scraper.scraper_type}")
+
+        # Return preview (not saved)
+        preview = [
+            {
+                "title": r.get("title", ""),
+                "source_url": r.get("source_url"),
+                "agency": r.get("agency"),
+                "response_deadline": r.get("response_deadline").isoformat() if r.get("response_deadline") else None,
+                "naics_code": r.get("naics_code"),
+                "set_aside_type": r.get("set_aside_type"),
+            }
+            for r in results[:10]
+        ]
+        return {"status": "ok", "count": len(results), "preview": preview}
+    except Exception as e:
+        return {"status": "error", "message": str(e), "preview": []}
+
+
 @router.post("/run-all")
 async def run_all_scrapers(
     db: AsyncSession = Depends(get_db),

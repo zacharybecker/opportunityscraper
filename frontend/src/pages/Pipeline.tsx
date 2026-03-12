@@ -1,13 +1,12 @@
+import { useState } from 'react'
 import {
-  Title, Stack, Card, Text, Badge, Group, Button, Select,
-  Loader, Center,
+  Title, Stack, Text, Badge, Group, Loader, Center,
 } from '@mantine/core'
+import { DragDropContext, Droppable, type DropResult } from '@hello-pangea/dnd'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
-import dayjs from 'dayjs'
-import { getPipeline, updatePipelineEntry, deletePipelineEntry } from '../api'
-import { notifications } from '@mantine/notifications'
-import type { PipelineEntry } from '../types'
+import { getPipeline, movePipelineEntry } from '../api'
+import PipelineCard from '../components/pipeline/PipelineCard'
+import PipelineDetailDrawer from '../components/pipeline/PipelineDetailDrawer'
 
 const STAGES = [
   { key: 'found', label: 'Found', color: 'gray' },
@@ -16,31 +15,36 @@ const STAGES = [
   { key: 'applied', label: 'Applied', color: 'violet' },
   { key: 'won', label: 'Won', color: 'green' },
   { key: 'lost', label: 'Lost', color: 'red' },
+  { key: 'archived', label: 'Archived', color: 'orange' },
 ]
 
 export default function Pipeline() {
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [selectedEntry, setSelectedEntry] = useState<any>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['pipeline'],
     queryFn: getPipeline,
   })
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, ...rest }: any) => updatePipelineEntry(id, rest),
+  const moveMutation = useMutation({
+    mutationFn: ({ id, stage, position }: { id: string; stage: string; position: number }) =>
+      movePipelineEntry(id, { stage, position }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pipeline'] })
-      notifications.show({ title: 'Updated', message: 'Pipeline entry updated', color: 'green' })
     },
   })
 
-  const deleteMutation = useMutation({
-    mutationFn: deletePipelineEntry,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pipeline'] })
-    },
-  })
+  const onDragEnd = (result: DropResult) => {
+    const { draggableId, destination } = result
+    if (!destination) return
+
+    moveMutation.mutate({
+      id: draggableId,
+      stage: destination.droppableId,
+      position: destination.index,
+    })
+  }
 
   if (isLoading) return <Center h={400}><Loader /></Center>
 
@@ -48,59 +52,57 @@ export default function Pipeline() {
     <Stack>
       <Title order={2}>Pipeline</Title>
 
-      <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 16 }}>
-        {STAGES.map(({ key, label, color }) => {
-          const entries: PipelineEntry[] = (data as any)?.[key] || []
-          return (
-            <div key={key} style={{ minWidth: 260, flex: 1 }}>
-              <Group mb="xs" gap="xs">
-                <Badge color={color} size="lg">{label}</Badge>
-                <Badge variant="light" color="gray" size="sm">{entries.length}</Badge>
-              </Group>
-              <Stack gap="xs">
-                {entries.map((entry) => {
-                  const opp = (entry as any).opportunity
-                  return (
-                    <Card key={entry.id} shadow="xs" padding="sm" radius="sm" withBorder>
-                      <Text
-                        size="sm" fw={500} lineClamp={2}
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => navigate(`/opportunities/${entry.opportunity_id}`)}
-                      >
-                        {opp?.title || 'Opportunity'}
-                      </Text>
-                      <Group mt="xs" gap="xs">
-                        {opp?.analysis?.relevancy_score != null && (
-                          <Badge size="xs" variant="light">{opp.analysis.relevancy_score}%</Badge>
+      <DragDropContext onDragEnd={onDragEnd}>
+        <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 16 }}>
+          {STAGES.map(({ key, label, color }) => {
+            const entries: any[] = (data as any)?.[key] || []
+            return (
+              <div key={key} style={{ minWidth: 240, flex: 1 }}>
+                <Group mb="xs" gap="xs">
+                  <Badge color={color} size="lg">{label}</Badge>
+                  <Badge variant="light" color="gray" size="sm">{entries.length}</Badge>
+                </Group>
+                <Droppable droppableId={key}>
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      style={{
+                        minHeight: 100,
+                        padding: 4,
+                        borderRadius: 8,
+                        backgroundColor: snapshot.isDraggingOver ? 'var(--mantine-color-blue-0)' : undefined,
+                        transition: 'background-color 0.2s',
+                      }}
+                    >
+                      <Stack gap="xs">
+                        {entries.map((entry, index) => (
+                          <PipelineCard
+                            key={entry.id}
+                            entry={entry}
+                            index={index}
+                            onClick={() => setSelectedEntry(entry)}
+                          />
+                        ))}
+                        {provided.placeholder}
+                        {entries.length === 0 && !snapshot.isDraggingOver && (
+                          <Text size="sm" c="dimmed" ta="center" py="lg">Empty</Text>
                         )}
-                        {opp?.response_deadline && (
-                          <Text size="xs" c="dimmed">{dayjs(opp.response_deadline).format('MMM D')}</Text>
-                        )}
-                        <Badge size="xs" variant="outline">P{entry.priority}</Badge>
-                      </Group>
-                      <Group mt="xs" gap="xs">
-                        <Select
-                          size="xs"
-                          data={STAGES.map((s) => ({ value: s.key, label: s.label }))}
-                          value={entry.stage}
-                          onChange={(val) => val && val !== entry.stage && updateMutation.mutate({ id: entry.id, stage: val })}
-                          style={{ flex: 1 }}
-                        />
-                        <Button size="xs" variant="subtle" color="red" onClick={() => deleteMutation.mutate(entry.id)}>
-                          ×
-                        </Button>
-                      </Group>
-                    </Card>
-                  )
-                })}
-                {entries.length === 0 && (
-                  <Text size="sm" c="dimmed" ta="center" py="lg">Empty</Text>
-                )}
-              </Stack>
-            </div>
-          )
-        })}
-      </div>
+                      </Stack>
+                    </div>
+                  )}
+                </Droppable>
+              </div>
+            )
+          })}
+        </div>
+      </DragDropContext>
+
+      <PipelineDetailDrawer
+        entry={selectedEntry}
+        opened={!!selectedEntry}
+        onClose={() => setSelectedEntry(null)}
+      />
     </Stack>
   )
 }

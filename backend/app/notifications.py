@@ -11,6 +11,7 @@ from sqlalchemy import select
 from app.config import settings
 from app.db import async_session
 from app.models import (
+    InAppNotification,
     NotificationLog,
     NotificationRule,
     Opportunity,
@@ -227,6 +228,22 @@ async def fire_notification(
     # Build email body
     body = build_email_body(payload)
 
+    # Always create in-app notification
+    try:
+        async with async_session() as notif_db:
+            in_app = InAppNotification(
+                user_id=rule.user_id,
+                title=subject,
+                body=body[:500] if body else "",
+                category=_get_category(payload.get("event", "")),
+                link=f"/opportunities/{payload.get('opportunity_id', '')}" if payload.get("opportunity_id") else None,
+                opportunity_id=opportunity_id,
+            )
+            notif_db.add(in_app)
+            await notif_db.commit()
+    except Exception as e:
+        logger.error(f"Failed to create in-app notification: {e}")
+
     for channel in channels:
         status = "failed"
         if channel == "email":
@@ -248,6 +265,16 @@ async def fire_notification(
             status=status,
             opportunity_id=opportunity_id,
         )
+
+
+def _get_category(event: str) -> str:
+    if event in ("high_relevancy", "new_opportunity", "deadline_approaching"):
+        return "opportunity"
+    elif event in ("scrape_complete", "scrape_failed"):
+        return "scraper"
+    elif "pipeline" in event:
+        return "pipeline"
+    return "system"
 
 
 def build_email_body(payload: dict) -> str:

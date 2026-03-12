@@ -21,15 +21,20 @@ import {
   IconShield,
   IconLogout,
   IconSpider,
+  IconFiles,
+  IconFileText,
 } from '@tabler/icons-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../store'
 import { useLogout } from '../hooks/useAuth'
+import { NotificationBell } from './NotificationBell'
 
 const navItems = [
   { label: 'Dashboard', icon: IconDashboard, path: '/' },
   { label: 'Opportunities', icon: IconSearch, path: '/opportunities' },
   { label: 'Pipeline', icon: IconLayoutKanban, path: '/pipeline' },
+  { label: 'Proposals', icon: IconFileText, path: '/proposals' },
+  { label: 'Knowledge Base', icon: IconFiles, path: '/knowledge' },
   { label: 'Company Profile', icon: IconBuilding, path: '/company' },
   { label: 'Scrapers', icon: IconSpider, path: '/scrapers' },
   { label: 'Settings', icon: IconSettings, path: '/settings' },
@@ -58,22 +63,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <IconRobot size={28} />
             <Text fw={700} size="lg">OpportunityScraper</Text>
           </Group>
-          <Menu shadow="md" width={200}>
-            <Menu.Target>
-              <UnstyledButton>
-                <Group gap="xs">
-                  <Avatar radius="xl" size="sm">{user?.display_name?.[0] || user?.username?.[0] || '?'}</Avatar>
-                  <Text size="sm">{user?.display_name || user?.username}</Text>
-                </Group>
-              </UnstyledButton>
-            </Menu.Target>
-            <Menu.Dropdown>
-              <Menu.Label>{user?.role}</Menu.Label>
-              <Menu.Item leftSection={<IconLogout size={14} />} onClick={logout}>
-                Logout
-              </Menu.Item>
-            </Menu.Dropdown>
-          </Menu>
+          <Group gap="sm">
+            <NotificationBell />
+            <Menu shadow="md" width={200}>
+              <Menu.Target>
+                <UnstyledButton>
+                  <Group gap="xs">
+                    <Avatar radius="xl" size="sm">{user?.display_name?.[0] || user?.username?.[0] || '?'}</Avatar>
+                    <Text size="sm">{user?.display_name || user?.username}</Text>
+                  </Group>
+                </UnstyledButton>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Label>{user?.role}</Menu.Label>
+                <Menu.Item leftSection={<IconLogout size={14} />} onClick={logout}>
+                  Logout
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          </Group>
         </Group>
       </MantineAppShell.Header>
 

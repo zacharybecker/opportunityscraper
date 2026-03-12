@@ -18,6 +18,32 @@ security = HTTPBearer()
 
 ROLE_HIERARCHY = {"admin": 3, "analyst": 2, "viewer": 1}
 
+# Password hashing
+from passlib.context import CryptContext
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return pwd_context.verify(plain, hashed)
+
+
+async def local_authenticate(username_or_email: str, password: str, db: AsyncSession) -> Optional[User]:
+    """Authenticate a local user by username or email."""
+    result = await db.execute(
+        select(User).where(
+            User.auth_provider == "local",
+            (User.username == username_or_email) | (User.email == username_or_email),
+        )
+    )
+    user = result.scalar_one_or_none()
+    if user and user.password_hash and verify_password(password, user.password_hash):
+        return user
+    return None
+
 
 def ldap_authenticate(username: str, password: str) -> Optional[dict]:
     """Authenticate via LDAP bind and return user info + groups."""

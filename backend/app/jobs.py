@@ -58,6 +58,46 @@ def setup_scheduler():
     return scheduler
 
 
+async def seed_default_scrapers():
+    """Create a default SAM.gov scraper if SAM_GOV_API_KEY is set and no scrapers exist."""
+    from app.config import settings
+
+    if not settings.SAM_GOV_API_KEY:
+        logger.info("No SAM_GOV_API_KEY set, skipping default scraper seed")
+        return
+
+    async with async_session() as db:
+        result = await db.execute(select(ScraperConfig))
+        if result.scalars().first():
+            logger.info("Scrapers already exist, skipping seed")
+            return
+
+        scraper = ScraperConfig(
+            name="SAM.gov - All Opportunities",
+            scraper_type="sam_gov",
+            is_enabled=True,
+            schedule_cron="0 6 * * *",  # Daily at 6 AM
+            config={
+                "api_key": settings.SAM_GOV_API_KEY,
+                "lookback_days": 30,
+            },
+        )
+        db.add(scraper)
+        await db.commit()
+        logger.info("Created default SAM.gov scraper with daily 6 AM schedule")
+
+        # Trigger an initial run immediately
+        run = ScrapeRun(
+            scraper_config_id=scraper.id,
+            status="pending",
+            trigger_type="startup",
+        )
+        db.add(run)
+        await db.commit()
+        asyncio.create_task(execute_scrape_run(str(run.id)))
+        logger.info("Triggered initial SAM.gov scrape run")
+
+
 async def sync_scraper_schedules():
     """Sync scraper cron schedules to APScheduler."""
     global scheduler

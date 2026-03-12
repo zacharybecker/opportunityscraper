@@ -2,12 +2,21 @@ import { useState, useRef, useEffect } from 'react'
 import {
   Title, Stack, Card, TextInput, Button, Group, Text,
   ScrollArea, Loader, ActionIcon, Paper, NavLink, Center,
+  Badge,
 } from '@mantine/core'
 import { IconSend, IconPlus, IconTrash, IconMessageCircle } from '@tabler/icons-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getChatSessions, createChatSession, deleteChatSession } from '../api'
 import { useAuthStore } from '../store'
 import type { ChatSession, ChatMessage } from '../types'
+
+const SUGGESTED_QUERIES = [
+  'What cybersecurity opportunities should we pursue?',
+  'Show me high-relevancy opportunities expiring this month',
+  'What is our current pipeline status?',
+  'Which opportunities match our NAICS codes?',
+  'Summarize our company capabilities',
+]
 
 export default function Chat() {
   const queryClient = useQueryClient()
@@ -53,10 +62,10 @@ export default function Chat() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, streamingContent])
 
-  const sendMessage = async () => {
-    if (!input.trim() || !activeSession || streaming) return
+  const sendMessage = async (text?: string) => {
+    const userMsg = (text || input).trim()
+    if (!userMsg || !activeSession || streaming) return
 
-    const userMsg = input.trim()
     setInput('')
     setMessages((prev) => [...prev, { role: 'user', content: userMsg, created_at: new Date().toISOString() }])
     setStreaming(true)
@@ -115,6 +124,13 @@ export default function Chat() {
     }
   }
 
+  // Extract opportunity references from assistant messages
+  const renderMessage = (msg: ChatMessage) => {
+    return (
+      <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</Text>
+    )
+  }
+
   return (
     <Stack h="calc(100vh - 140px)">
       <Title order={2}>Chat</Title>
@@ -153,6 +169,22 @@ export default function Chat() {
             <>
               <ScrollArea style={{ flex: 1 }} viewportRef={scrollRef}>
                 <Stack gap="sm" p="xs">
+                  {messages.length === 0 && !streaming && (
+                    <Stack gap="xs" mt="xl">
+                      <Text size="sm" c="dimmed" ta="center" mb="md">Try asking:</Text>
+                      {SUGGESTED_QUERIES.map((q) => (
+                        <Button
+                          key={q}
+                          variant="light"
+                          size="sm"
+                          onClick={() => sendMessage(q)}
+                          style={{ textAlign: 'left', height: 'auto', padding: '8px 12px' }}
+                        >
+                          {q}
+                        </Button>
+                      ))}
+                    </Stack>
+                  )}
                   {messages.map((msg, i) => (
                     <Paper
                       key={i}
@@ -162,7 +194,7 @@ export default function Chat() {
                       style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '80%' }}
                     >
                       <Text size="xs" c="dimmed" mb={4}>{msg.role === 'user' ? 'You' : 'Assistant'}</Text>
-                      <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</Text>
+                      {renderMessage(msg)}
                     </Paper>
                   ))}
                   {streaming && streamingContent && (
@@ -172,28 +204,32 @@ export default function Chat() {
                     </Paper>
                   )}
                   {streaming && !streamingContent && (
-                    <Group gap="xs"><Loader size="xs" /><Text size="sm" c="dimmed">Thinking...</Text></Group>
+                    <Group gap="xs"><Loader size="xs" /><Text size="sm" c="dimmed">Searching and thinking...</Text></Group>
                   )}
                 </Stack>
               </ScrollArea>
 
               <Group mt="md" gap="xs">
                 <TextInput
-                  placeholder="Ask about opportunities, pipeline, deadlines..."
+                  placeholder="Ask about opportunities, pipeline, knowledge base..."
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                   style={{ flex: 1 }}
                   disabled={streaming}
                 />
-                <ActionIcon size="lg" onClick={sendMessage} disabled={streaming || !input.trim()}>
+                <ActionIcon size="lg" onClick={() => sendMessage()} disabled={streaming || !input.trim()}>
                   <IconSend size={18} />
                 </ActionIcon>
               </Group>
             </>
           ) : (
             <Center style={{ flex: 1 }}>
-              <Text c="dimmed">Select or create a chat session</Text>
+              <Stack align="center" gap="md">
+                <IconMessageCircle size={48} color="var(--mantine-color-gray-4)" />
+                <Text c="dimmed">Select or create a chat session</Text>
+                <Button variant="light" onClick={() => createMutation.mutate()}>Start New Chat</Button>
+              </Stack>
             </Center>
           )}
         </Card>

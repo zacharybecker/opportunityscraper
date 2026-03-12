@@ -23,7 +23,14 @@
     "recharts": "^2.12.7",
     "zustand": "^5.0.0",
     "@hello-pangea/dnd": "^17.0.0",
-    "@tabler/icons-react": "^3.19.0"
+    "@tabler/icons-react": "^3.19.0",
+    "@mantine/dropzone": "^7.13.0",
+    "@tiptap/react": "^2.6.0",
+    "@tiptap/starter-kit": "^2.6.0",
+    "@tiptap/extension-highlight": "^2.6.0",
+    "@tiptap/extension-placeholder": "^2.6.0",
+    "@tiptap/extension-text-align": "^2.6.0",
+    "@tiptap/extension-underline": "^2.6.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.10",

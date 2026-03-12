@@ -67,6 +67,9 @@ export const getScraperRuns = (id: string) =>
 export const runAllScrapers = () =>
   apiClient.post('/scrapers/run-all').then((r) => r.data)
 
+export const testScraper = (id: string) =>
+  apiClient.post(`/scrapers/${id}/test`).then((r) => r.data)
+
 // Opportunities
 export const getOpportunities = (params: Record<string, any>) =>
   apiClient.get<PaginatedResponse<Opportunity>>('/opportunities', { params }).then((r) => r.data)
@@ -95,6 +98,18 @@ export const deletePipelineEntry = (id: string) =>
 
 export const getPipelineStats = () =>
   apiClient.get('/pipeline/stats').then((r) => r.data)
+
+export const movePipelineEntry = (id: string, data: { stage: string; position: number }) =>
+  apiClient.put(`/pipeline/${id}/move`, data).then((r) => r.data)
+
+export const getPipelineComments = (entryId: string) =>
+  apiClient.get(`/pipeline/${entryId}/comments`).then((r) => r.data)
+
+export const addPipelineComment = (entryId: string, content: string) =>
+  apiClient.post(`/pipeline/${entryId}/comments`, { content }).then((r) => r.data)
+
+export const deletePipelineComment = (entryId: string, commentId: string) =>
+  apiClient.delete(`/pipeline/${entryId}/comments/${commentId}`).then((r) => r.data)
 
 // Chat
 export const getChatSessions = () =>

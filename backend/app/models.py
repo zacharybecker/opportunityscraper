@@ -14,7 +14,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, relationship
 from sqlalchemy.types import DateTime
 
@@ -34,12 +34,18 @@ class User(Base):
     ldap_groups = Column(JSONB, default=[])
     is_active = Column(Boolean, default=True)
     is_superadmin = Column(Boolean, default=False)
+    auth_provider = Column(String(20), default="ldap")
+    password_hash = Column(String(255), nullable=True)
+    email_verified = Column(Boolean, default=False)
+    password_reset_token = Column(String(255), nullable=True)
+    password_reset_expires = Column(DateTime(timezone=True), nullable=True)
     last_login = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     notification_rules = relationship("NotificationRule", back_populates="user", cascade="all, delete-orphan")
     chat_sessions = relationship("ChatSession", back_populates="user", cascade="all, delete-orphan")
+
 
 
 class LdapGroupRole(Base):
@@ -137,6 +143,7 @@ class Opportunity(Base):
     raw_data = Column(JSONB)
     documents = Column(JSONB, default=[])
     content_hash = Column(String(64))
+    search_vector = Column(TSVECTOR)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -146,6 +153,7 @@ class Opportunity(Base):
         Index("idx_opp_posted", "posted_date"),
         Index("idx_opp_hash", "content_hash"),
         Index("idx_opp_naics", "naics_code"),
+        Index("idx_opp_search", "search_vector", postgresql_using="gin"),
     )
 
     analysis = relationship("OpportunityAnalysis", back_populates="opportunity", uselist=False, cascade="all, delete-orphan")
@@ -190,6 +198,7 @@ class PipelineEntry(Base):
     assigned_to = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     notes = Column(Text)
     priority = Column(Integer, default=5)
+    position = Column(Integer, default=0)
     history = Column(JSONB, default=[])
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -199,6 +208,19 @@ class PipelineEntry(Base):
     )
 
     opportunity = relationship("Opportunity", back_populates="pipeline_entry")
+    pipeline_comments = relationship("PipelineComment", back_populates="pipeline_entry", cascade="all, delete-orphan")
+
+
+class PipelineComment(Base):
+    __tablename__ = "pipeline_comments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    pipeline_entry_id = Column(UUID(as_uuid=True), ForeignKey("pipeline_entries.id", ondelete="CASCADE"))
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    pipeline_entry = relationship("PipelineEntry", back_populates="pipeline_comments")
 
 
 class NotificationRule(Base):
@@ -232,6 +254,47 @@ class NotificationLog(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class KnowledgeDocument(Base):
+    __tablename__ = "knowledge_documents"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id = Column(UUID(as_uuid=True), ForeignKey("company_profiles.id", ondelete="CASCADE"), nullable=True)
+    title = Column(String(500), nullable=False)
+    doc_type = Column(String(20), nullable=False, default="text")
+    file_path = Column(String(2048), nullable=True)
+    original_filename = Column(String(500))
+    url = Column(String(2048), nullable=True)
+    extracted_text = Column(Text, nullable=True)
+    metadata_ = Column("metadata", JSONB, default={})
+    category = Column(String(50), default="general")
+    search_vector = Column(TSVECTOR, nullable=True)
+    uploaded_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index("idx_kb_search", "search_vector", postgresql_using="gin"),
+    )
+
+
+class InAppNotification(Base):
+    __tablename__ = "in_app_notifications"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
+    title = Column(String(500), nullable=False)
+    body = Column(Text)
+    category = Column(String(50), default="system")
+    link = Column(String(2048), nullable=True)
+    is_read = Column(Boolean, default=False)
+    opportunity_id = Column(UUID(as_uuid=True), ForeignKey("opportunities.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_notif_user_read", "user_id", "is_read", "created_at"),
+    )
+
+
 class ChatSession(Base):
     __tablename__ = "chat_sessions"
 
@@ -243,6 +306,64 @@ class ChatSession(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     user = relationship("User", back_populates="chat_sessions")
+
+
+class Proposal(Base):
+    __tablename__ = "proposals"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    opportunity_id = Column(UUID(as_uuid=True), ForeignKey("opportunities.id", ondelete="SET NULL"), nullable=True)
+    title = Column(String(500), nullable=False)
+    status = Column(String(30), default="draft")
+    template_id = Column(UUID(as_uuid=True), ForeignKey("proposal_templates.id", ondelete="SET NULL"), nullable=True)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    versions = relationship("ProposalVersion", back_populates="proposal", cascade="all, delete-orphan")
+    comments = relationship("ProposalComment", back_populates="proposal", cascade="all, delete-orphan")
+    opportunity = relationship("Opportunity")
+
+
+class ProposalVersion(Base):
+    __tablename__ = "proposal_versions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    proposal_id = Column(UUID(as_uuid=True), ForeignKey("proposals.id", ondelete="CASCADE"))
+    version_number = Column(Integer, nullable=False, default=1)
+    content = Column(JSONB, default={})
+    sections = Column(JSONB, default=[])
+    change_summary = Column(Text, nullable=True)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    proposal = relationship("Proposal", back_populates="versions")
+
+
+class ProposalTemplate(Base):
+    __tablename__ = "proposal_templates"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    sections = Column(JSONB, default=[])
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class ProposalComment(Base):
+    __tablename__ = "proposal_comments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    proposal_id = Column(UUID(as_uuid=True), ForeignKey("proposals.id", ondelete="CASCADE"))
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    content = Column(Text, nullable=False)
+    section_key = Column(String(255), nullable=True)
+    resolved = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    proposal = relationship("Proposal", back_populates="comments")
 
 
 class NAICSCode(Base):

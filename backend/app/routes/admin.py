@@ -1,3 +1,5 @@
+from pydantic import BaseModel
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -131,6 +133,27 @@ async def update_ai_config(
         max_tokens=settings.AI_MAX_TOKENS,
         temperature=settings.AI_TEMPERATURE,
     )
+
+
+
+class TestEmailRequest(BaseModel):
+    to: str
+
+
+@router.post("/test-email")
+async def test_email(
+    body: TestEmailRequest,
+    user: User = Depends(require_role("admin")),
+):
+    from app.notifications import send_email
+    success = await send_email(
+        body.to,
+        "OpportunityScraper - Test Email",
+        "<h2>Test Email</h2><p>This is a test email from OpportunityScraper.</p><p>If you received this, SMTP is configured correctly.</p>",
+    )
+    if success:
+        return {"status": "sent", "to": body.to}
+    raise HTTPException(status_code=500, detail="Failed to send email. Check SMTP configuration.")
 
 
 @router.get("/health")

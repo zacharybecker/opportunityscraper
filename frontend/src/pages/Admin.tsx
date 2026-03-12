@@ -14,6 +14,7 @@ import {
   getAiConfig, updateAiConfig,
   getHealth,
 } from '../api'
+import apiClient from '../api/client'
 import { notifications } from '@mantine/notifications'
 import type { LdapGroupRole, User } from '../types'
 
@@ -165,6 +166,13 @@ function AIConfigTab() {
 
 function HealthTab() {
   const { data, isLoading, refetch } = useQuery({ queryKey: ['health'], queryFn: getHealth })
+  const [testEmail, setTestEmail] = useState('')
+
+  const testEmailMutation = useMutation({
+    mutationFn: (to: string) => apiClient.post('/admin/test-email', { to }).then((r) => r.data),
+    onSuccess: () => notifications.show({ title: 'Sent', message: 'Test email sent successfully', color: 'green' }),
+    onError: () => notifications.show({ title: 'Failed', message: 'Failed to send test email', color: 'red' }),
+  })
 
   if (isLoading) return <Loader />
 
@@ -183,9 +191,28 @@ function HealthTab() {
           </Group>
         ))}
       </Card>
+      <Card shadow="sm" padding="lg" radius="md" withBorder>
+        <Title order={4} mb="sm">Test Email</Title>
+        <Group>
+          <TextInput
+            placeholder="recipient@example.com"
+            value={testEmail}
+            onChange={(e) => setTestEmail(e.target.value)}
+            style={{ flex: 1 }}
+          />
+          <Button
+            onClick={() => testEmail && testEmailMutation.mutate(testEmail)}
+            loading={testEmailMutation.isPending}
+            disabled={!testEmail}
+          >
+            Send Test
+          </Button>
+        </Group>
+      </Card>
     </Stack>
   )
 }
+
 
 export default function Admin() {
   return (

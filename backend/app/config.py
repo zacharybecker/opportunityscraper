@@ -30,12 +30,18 @@ class Settings(BaseSettings):
     AI_MAX_TOKENS: int = 4096
     AI_TEMPERATURE: float = 0.3
 
+    # SAM.gov
+    SAM_GOV_API_KEY: str = ""
+
     # SMTP
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     SMTP_FROM: str = ""
+
+    # File storage
+    UPLOAD_DIR: str = "/app/uploads"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
